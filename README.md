@@ -212,8 +212,8 @@ mern-ecommerce-admin-panel/
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/zewar-house.git
-cd zewar-house
+git clone [https://github.com/mani901/virtual-jewelry-tryon-ecommerce.git]
+cd virtual-jewelry-tryon-ecommerce
 ```
 
 ### 2. Install Dependencies
@@ -356,8 +356,7 @@ Use these in development — no real charges occur:
 **Categories:** Necklaces · Earrings · Rings · Bracelets · Anklets  
 **Materials:** Gold · Silver · Diamond · Pearl · Gemstone  
 **Currency:** PKR (₨)  
-**Sizes:** None — size selection was intentionally removed from this project.
 
 ---
 
-*Built as a Final Year Project demonstrating MERN stack development, computer vision, and machine learning integration for an e-commerce use case.*
+*Built for demonstrating MERN stack development, computer vision, and machine learning integration for an e-commerce use case.*
