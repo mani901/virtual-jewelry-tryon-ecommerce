@@ -1,4 +1,4 @@
-# Zewar House — AI-Powered Jewellery E-Commerce Platform
+# Zewar House : AI-Powered Jewellery E-Commerce Platform
 
 > A full-stack MERN e-commerce platform for a Pakistani women's jewellery brand, featuring an **AI Virtual Try-On system** that detects face shape and overlays jewellery in real time using MediaPipe, OpenCV, and a trained RandomForest classifier.
 
