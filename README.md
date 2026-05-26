@@ -212,7 +212,7 @@ mern-ecommerce-admin-panel/
 ### 1. Clone the Repository
 
 ```bash
-git clone [https://github.com/mani901/virtual-jewelry-tryon-ecommerce.git]
+git clone https://github.com/mani901/virtual-jewelry-tryon-ecommerce.git
 cd virtual-jewelry-tryon-ecommerce
 ```
 
