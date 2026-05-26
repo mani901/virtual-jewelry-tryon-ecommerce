@@ -1,0 +1,37 @@
+node_modules/
+CLAUDE.md
+
+# --- Environment Variables & Secrets ---
+*.env
+! .env  # <--- This forces Git to allow the exact file named ".env"
+
+# --- Virtual Environments ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Python Cache & Temporary Files ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- Database & Storage (Local Dev) ---
+*.db
+*.sqlite3
+/data/
+
+# --- IDEs and Editors ---
+.vscode/
+.idea/
+*.swp
+
+# --- OS Specific ---
+.DS_Store
+Thumbs.db
