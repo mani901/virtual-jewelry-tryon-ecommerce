@@ -56,7 +56,7 @@ const Add = ({ token }) => {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState('')
-  const [category, setCategory] = useState('Necklaces')
+  const [category, setCategory] = useState('Earrings')
   const [subCategory, setSubCategory] = useState('Gold')
   const [bestseller, setBestseller] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -176,7 +176,7 @@ const Add = ({ token }) => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5" htmlFor="product-cat">Category</label>
             <select id="product-cat" value={category} onChange={e => setCategory(e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-admin-accent">
-              {['Necklaces', 'Earrings', 'Rings', 'Bracelets', 'Anklets'].map(c => <option key={c} value={c}>{c}</option>)}
+              {['Earrings', 'Glasses', 'Nose Rings', 'Headpieces'].map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div>

@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"d:\\\\Arslan_FYP\\\\mern-ecommerce-admin-panel\" -Recurse -Directory)"
+    ]
+  }
+}

@@ -7,7 +7,7 @@ import EmptyState from '../components/ui/EmptyState'
 import { TableRowSkeleton } from '../components/ui/Skeleton'
 import Pagination from '../components/ui/Pagination'
 
-const CATEGORIES = ['All', 'Necklaces', 'Earrings', 'Rings', 'Bracelets', 'Anklets']
+const CATEGORIES = ['All', 'Earrings', 'Glasses', 'Nose Rings', 'Headpieces']
 const PER_PAGE = 10
 
 const List = ({ token }) => {

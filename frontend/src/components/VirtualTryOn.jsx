@@ -5,10 +5,9 @@ const AI_MODEL_URL = import.meta.env.VITE_AI_MODEL_URL || 'http://localhost:8000
 
 const CATEGORY_JEWELRY_MAP = {
   Earrings: 'earrings',
-  Necklaces: 'headpiece',
-  Rings: 'nose_ring',
-  Bracelets: 'earrings',
-  Anklets: 'earrings',
+  Glasses: 'glasses',
+  'Nose Rings': 'nose_ring',
+  Headpieces: 'headpiece',
 }
 
 const FACE_SHAPE_DESCRIPTIONS = {
@@ -137,9 +136,25 @@ export default function VirtualTryOn({ isOpen, onClose, product }) {
     setStep('processing')
 
     try {
+      // Pick the jewelry file that matches this product's image.
+      // Seed names files "{type}-{n}.ext" (1-based), so we extract n and
+      // select files[n-1] from the AI model's sorted list for this type.
+      let jewelryFilename = ''
+      try {
+        const listRes = await axios.get(`${AI_MODEL_URL}/jewelry`)
+        const files = listRes.data[jewelryType] ?? []
+        const imgUrl = product?.image?.[0] ?? ''
+        const match = imgUrl.match(/-(\d+)\.[^.]+$/)
+        const idx = match ? parseInt(match[1], 10) - 1 : 0
+        jewelryFilename = files[Math.min(idx, files.length - 1)]?.filename ?? files[0]?.filename ?? ''
+      } catch {
+        // If listing fails, backend will auto-select; continue without it
+      }
+
       const formData = new FormData()
       formData.append('file', capturedFile)
       formData.append('jewelry_type', jewelryType)
+      if (jewelryFilename) formData.append('jewelry_filename', jewelryFilename)
 
       const res = await axios.post(`${AI_MODEL_URL}/try-on`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },

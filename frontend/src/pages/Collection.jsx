@@ -5,7 +5,7 @@ import Title from '../components/Title'
 import ProductItem, { ProductItemSkeleton } from '../components/ProductItem'
 import EmptyState from '../components/ui/EmptyState'
 
-const CATEGORIES = ['Necklaces', 'Earrings', 'Rings', 'Bracelets', 'Anklets']
+const CATEGORIES = ['Earrings', 'Glasses', 'Nose Rings', 'Headpieces']
 const MATERIALS = ['Gold', 'Silver', 'Diamond', 'Pearl', 'Gemstone']
 
 const Collection = () => {
