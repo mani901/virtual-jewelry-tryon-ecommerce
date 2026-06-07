@@ -11,6 +11,15 @@ venv/
 env/
 ENV/
 
+venv/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+ai-model/app/outputs/
+ai-model/app/uploads/
+
+
 # --- Python Cache & Temporary Files ---
 __pycache__/
 *.pyc
