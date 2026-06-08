@@ -1,4 +1,11 @@
 import productModel from "../models/productModel.js"
+import path from "path"
+import fs from "fs"
+import { fileURLToPath } from "url"
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname  = path.dirname(__filename)
+const UPLOADS_DIR = path.join(__dirname, '..', 'uploads')
 
 const addProduct = async (req, res) => {
     try {
@@ -10,7 +17,10 @@ const addProduct = async (req, res) => {
         const image4 = req.files.image4 && req.files.image4[0]
 
         const images = [image1, image2, image3, image4].filter(Boolean)
-        const baseUrl = `${req.protocol}://${req.get('host')}`
+
+        // Use BACKEND_URL env var so the stored URL is always correct regardless
+        // of how Express detects the protocol/host (proxy, Docker, etc.).
+        const baseUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`
         const imagesUrl = images.map(f => `${baseUrl}/uploads/${f.filename}`)
 
         const productData = {
@@ -47,6 +57,24 @@ const listProducts = async (req, res) => {
 
 const removeProduct = async (req, res) => {
     try {
+        const product = await productModel.findById(req.body.id)
+
+        if (product) {
+            // Delete the locally stored image files so disk doesn't accumulate
+            // orphaned uploads every time a product is removed.
+            for (const imgUrl of product.image || []) {
+                const filename = imgUrl.split('/uploads/').pop()
+                if (filename) {
+                    const filePath = path.join(UPLOADS_DIR, filename)
+                    try {
+                        if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+                    } catch {
+                        // Ignore — file may already be gone
+                    }
+                }
+            }
+        }
+
         await productModel.findByIdAndDelete(req.body.id)
         res.json({ success: true, message: "Product Removed" })
     } catch (error) {

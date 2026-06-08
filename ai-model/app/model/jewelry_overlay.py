@@ -451,7 +451,7 @@ def overlay_nose_ring(image_rgb: np.ndarray, points: dict,
     # span produces a realistically-sized ring.  Clamp to 10–18 % of face
     # height so the ring is never invisible at close/far camera distances.
     nostril_span  = abs(float(left_nostril[0]) - float(right_nostril[0]))
-    target_size   = float(np.clip(nostril_span * 0.75,
+    target_size   = float(np.clip(nostril_span * 0.45,
                                   face_height * 0.10,
                                   face_height * 0.18))
 
@@ -470,8 +470,8 @@ def overlay_nose_ring(image_rgb: np.ndarray, points: dict,
     ax = int(left_nostril[0])
     ay = int(left_nostril[1])
 
-    # Shift upward by 15 % of ring height so clip sits ON the nostril edge
-    y_offset = int(nose_ring.shape[0] * 0.15)
+    # Shift upward so ring clips onto the nostril edge, not below it
+    y_offset = int(nose_ring.shape[0] * 0.42)
 
     x = ax - nose_ring.shape[1] // 2
     y = ay - nose_ring.shape[0] // 2 - y_offset
@@ -545,7 +545,8 @@ _JEWELRY_MAP: dict[str, tuple] = {
 def apply_jewelry(image_rgb: np.ndarray, points: dict,
                   jewelry_type: str, jewelry_filename: str,
                   measurements: dict | None = None,
-                  pose: dict | None = None) -> np.ndarray:
+                  pose: dict | None = None,
+                  jewelry_path_override: Path | None = None) -> np.ndarray:
     """
     Resolve the asset path and call the correct overlay function.
 
@@ -557,6 +558,10 @@ def apply_jewelry(image_rgb: np.ndarray, points: dict,
     pose : dict
         Should come from face_analyzer.analyze_face()["pose"].
         Defaults to {"roll":0, "yaw":0, "pitch":0} if omitted.
+    jewelry_path_override : Path, optional
+        When provided, use this file directly as the jewelry asset instead of
+        looking up jewelry_filename inside JEWELRY_DIR.  Used when the caller
+        has already downloaded the product's Cloudinary image to a temp file.
     """
     if measurements is None:
         measurements = _fallback_measurements(points, image_rgb.shape)
@@ -567,8 +572,14 @@ def apply_jewelry(image_rgb: np.ndarray, points: dict,
         return image_rgb
 
     overlay_fn, subfolder = _JEWELRY_MAP[jewelry_type]
-    safe_name    = Path(jewelry_filename).name
-    jewelry_path = JEWELRY_DIR / subfolder / safe_name
+
+    # Prefer the caller-supplied path (downloaded product image); fall back to
+    # the local jewelry_assets folder for seed products / manual selection.
+    if jewelry_path_override and Path(jewelry_path_override).is_file():
+        jewelry_path = Path(jewelry_path_override)
+    else:
+        safe_name    = Path(jewelry_filename).name
+        jewelry_path = JEWELRY_DIR / subfolder / safe_name
 
     if not jewelry_path.is_file():
         return image_rgb
@@ -612,7 +623,8 @@ def generate_try_on(image_rgb: np.ndarray,
                     output_path,
                     measurements: dict | None = None,
                     pose: dict | None = None,
-                    debug: bool = False) -> Path:
+                    debug: bool = False,
+                    jewelry_path_override: Path | None = None) -> Path:
     """
     Generate and save the final try-on image.
 
@@ -621,17 +633,20 @@ def generate_try_on(image_rgb: np.ndarray,
     image_rgb      : RGB ndarray from face_analyzer.analyze_face()["image_rgb"].
     points         : landmark dict from analyze_face()["points"].
     jewelry_type   : "earrings" | "glasses" | "nose_ring" | "headpiece".
-    jewelry_filename : basename of the asset file.
+    jewelry_filename : basename of the asset file (used when no override given).
     output_path    : destination file path (JPEG or PNG).
     measurements   : from analyze_face()["measurements"] — pass for best accuracy.
     pose           : from analyze_face()["pose"]         — pass for head-tilt fix.
     debug          : if True, draws anchor points on the output image.
+    jewelry_path_override : when set, use this file directly as the jewelry asset
+                    (bypasses JEWELRY_DIR lookup — used for admin-uploaded products).
 
     Returns the resolved output_path as a Path.
     """
     result = apply_jewelry(
         image_rgb.copy(), points, jewelry_type, jewelry_filename,
         measurements=measurements, pose=pose,
+        jewelry_path_override=jewelry_path_override,
     )
 
     if debug:

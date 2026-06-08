@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from uuid import uuid4
 import shutil
+import urllib.request
 
 from .model.face_analyzer import analyze_face
 from .model.jewelry_overlay import generate_try_on
@@ -114,8 +115,19 @@ async def try_on_endpoint(
     file: UploadFile = File(...),
     jewelry_type: str = Form("earrings"),
     jewelry_filename: str = Form(None),
+    jewelry_image_url: str = Form(None),
 ):
-    file_path = None
+    """
+    jewelry_image_url (optional): direct URL to the product's own image
+    (e.g. a Cloudinary URL from the admin-uploaded product).  When supplied,
+    the AI model downloads and uses that image as the jewelry overlay so the
+    try-on always reflects the exact product — regardless of whether assets
+    exist in the local jewelry_assets folder.
+
+    Falls back to jewelry_filename / local assets when the URL is absent.
+    """
+    file_path         = None
+    jewelry_temp_path = None
     try:
         valid_types = ["earrings", "glasses", "nose_ring", "headpiece"]
 
@@ -125,8 +137,28 @@ async def try_on_endpoint(
                 detail=f"Invalid jewelry type. Choose from: {valid_types}"
             )
 
-        # Auto-select first available file when none provided
-        if not jewelry_filename:
+        # ── Save the user's face photo ───────────────────────────────────────
+        ext           = (Path(file.filename).suffix or ".jpg").lower()
+        safe_filename = f"{uuid4().hex}{ext}"
+        file_path     = UPLOADS_DIR / safe_filename
+
+        contents = await file.read()
+        with open(file_path, "wb") as buffer:
+            buffer.write(contents)
+
+        # ── Resolve jewelry asset ────────────────────────────────────────────
+        # Priority 1: caller passed a URL (admin-uploaded product image)
+        if jewelry_image_url:
+            try:
+                img_ext           = Path(jewelry_image_url.split("?")[0]).suffix or ".jpg"
+                jewelry_temp_path = UPLOADS_DIR / f"jewelry_{uuid4().hex}{img_ext}"
+                urllib.request.urlretrieve(jewelry_image_url, str(jewelry_temp_path))
+            except Exception:
+                # Download failed — fall through to local asset selection below
+                jewelry_temp_path = None
+
+        # Priority 2: filename from local assets folder (seed products / manual selection)
+        if jewelry_temp_path is None and not jewelry_filename:
             sub_map = {
                 "earrings": "earrings",
                 "glasses": "glasses",
@@ -146,14 +178,7 @@ async def try_on_endpoint(
                 )
             jewelry_filename = candidates[0]
 
-        ext           = (Path(file.filename).suffix or ".jpg").lower()
-        safe_filename = f"{uuid4().hex}{ext}"
-        file_path     = UPLOADS_DIR / safe_filename
-
-        contents = await file.read()
-        with open(file_path, "wb") as buffer:
-            buffer.write(contents)
-
+        # ── Face analysis ────────────────────────────────────────────────────
         result = analyze_face(str(file_path))
 
         if result is None:
@@ -162,23 +187,23 @@ async def try_on_endpoint(
         output_filename = f"tryon_{jewelry_type}_{safe_filename}"
         output_path     = OUTPUTS_DIR / output_filename
 
-        # Pass measurements + pose so overlay uses accurate scaling and rotation
         generate_try_on(
             result["image_rgb"],
             result["points"],
             jewelry_type,
-            jewelry_filename,
+            jewelry_filename or "product.jpg",
             output_path,
             measurements=result.get("measurements"),
             pose=result.get("pose"),
+            jewelry_path_override=jewelry_temp_path,
         )
 
         return {
-            "success":         True,
-            "face_shape":      str(result["face_shape"]),
-            "jewelry_type":    jewelry_type,
-            "jewelry_filename":jewelry_filename,
-            "download_url":    f"/download/{output_filename}",
+            "success":          True,
+            "face_shape":       str(result["face_shape"]),
+            "jewelry_type":     jewelry_type,
+            "jewelry_filename": jewelry_filename or "",
+            "download_url":     f"/download/{output_filename}",
         }
 
     except HTTPException:
@@ -186,11 +211,12 @@ async def try_on_endpoint(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        if file_path and file_path.exists():
-            try:
-                file_path.unlink()
-            except OSError:
-                pass
+        for p in (file_path, jewelry_temp_path):
+            if p and Path(p).exists():
+                try:
+                    Path(p).unlink()
+                except OSError:
+                    pass
 
 
 @app.get("/download/{filename}")
