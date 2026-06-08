@@ -136,25 +136,15 @@ export default function VirtualTryOn({ isOpen, onClose, product }) {
     setStep('processing')
 
     try {
-      // Pick the jewelry file that matches this product's image.
-      // Seed names files "{type}-{n}.ext" (1-based), so we extract n and
-      // select files[n-1] from the AI model's sorted list for this type.
-      let jewelryFilename = ''
-      try {
-        const listRes = await axios.get(`${AI_MODEL_URL}/jewelry`)
-        const files = listRes.data[jewelryType] ?? []
-        const imgUrl = product?.image?.[0] ?? ''
-        const match = imgUrl.match(/-(\d+)\.[^.]+$/)
-        const idx = match ? parseInt(match[1], 10) - 1 : 0
-        jewelryFilename = files[Math.min(idx, files.length - 1)]?.filename ?? files[0]?.filename ?? ''
-      } catch {
-        // If listing fails, backend will auto-select; continue without it
-      }
-
       const formData = new FormData()
       formData.append('file', capturedFile)
       formData.append('jewelry_type', jewelryType)
-      if (jewelryFilename) formData.append('jewelry_filename', jewelryFilename)
+
+      // Pass the product's own image URL so the AI model downloads and overlays
+      // the exact product image — works for Cloudinary URLs, seed URLs, and any
+      // future storage backend without needing local asset files.
+      const productImageUrl = product?.image?.[0]
+      if (productImageUrl) formData.append('jewelry_image_url', productImageUrl)
 
       const res = await axios.post(`${AI_MODEL_URL}/try-on`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
