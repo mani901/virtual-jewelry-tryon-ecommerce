@@ -38,13 +38,12 @@ async def health():
 
 @app.post("/analyze-face")
 async def analyze_face_endpoint(file: UploadFile = File(...)):
+    file_path = None
     try:
-        ext = Path(file.filename).suffix or ".jpg"
-        # normalize extension to include leading dot and lowercase
-        ext = ext if ext.startswith('.') else f'.{ext}'
-        ext = ext.lower()
+        ext           = (Path(file.filename).suffix or ".jpg").lower()
+        ext           = ext if ext.startswith('.') else f'.{ext}'
         safe_filename = f"{uuid4().hex}{ext}"
-        file_path = UPLOADS_DIR / safe_filename
+        file_path     = UPLOADS_DIR / safe_filename
 
         contents = await file.read()
         with open(file_path, "wb") as buffer:
@@ -56,16 +55,25 @@ async def analyze_face_endpoint(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail="No face detected in image")
 
         return {
-            "success": True,
-            "face_shape": str(result["face_shape"]),
-            "features": result["features"],
-            "points": result["points"]
+            "success":      True,
+            "face_shape":   str(result["face_shape"]),
+            "features":     result["features"],
+            "points":       result["points"],
+            "measurements": result.get("measurements", {}),
+            "pose":         result.get("pose", {}),
         }
 
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # Clean up temp upload to prevent unbounded disk growth
+        if file_path and file_path.exists():
+            try:
+                file_path.unlink()
+            except OSError:
+                pass
 
 
 @app.get("/jewelry")
@@ -107,6 +115,7 @@ async def try_on_endpoint(
     jewelry_type: str = Form("earrings"),
     jewelry_filename: str = Form(None),
 ):
+    file_path = None
     try:
         valid_types = ["earrings", "glasses", "nose_ring", "headpiece"]
 
@@ -137,9 +146,9 @@ async def try_on_endpoint(
                 )
             jewelry_filename = candidates[0]
 
-        ext = Path(file.filename).suffix or ".jpg"
+        ext           = (Path(file.filename).suffix or ".jpg").lower()
         safe_filename = f"{uuid4().hex}{ext}"
-        file_path = UPLOADS_DIR / safe_filename
+        file_path     = UPLOADS_DIR / safe_filename
 
         contents = await file.read()
         with open(file_path, "wb") as buffer:
@@ -151,29 +160,37 @@ async def try_on_endpoint(
             raise HTTPException(status_code=400, detail="No face detected in image")
 
         output_filename = f"tryon_{jewelry_type}_{safe_filename}"
-        output_path = OUTPUTS_DIR / output_filename
+        output_path     = OUTPUTS_DIR / output_filename
 
-        # Call generate_try_on with selected filename
+        # Pass measurements + pose so overlay uses accurate scaling and rotation
         generate_try_on(
             result["image_rgb"],
             result["points"],
             jewelry_type,
             jewelry_filename,
-            output_path
+            output_path,
+            measurements=result.get("measurements"),
+            pose=result.get("pose"),
         )
 
         return {
-            "success": True,
-            "face_shape": str(result["face_shape"]),
-            "jewelry_type": jewelry_type,
-            "jewelry_filename": jewelry_filename,
-            "download_url": f"/download/{output_filename}"
+            "success":         True,
+            "face_shape":      str(result["face_shape"]),
+            "jewelry_type":    jewelry_type,
+            "jewelry_filename":jewelry_filename,
+            "download_url":    f"/download/{output_filename}",
         }
 
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if file_path and file_path.exists():
+            try:
+                file_path.unlink()
+            except OSError:
+                pass
 
 
 @app.get("/download/{filename}")
