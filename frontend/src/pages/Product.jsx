@@ -2,11 +2,49 @@ import { useContext, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { ShopContext } from '../context/ShopContext'
 import { toast } from 'react-toastify'
+import axios from 'axios'
 import RelatedProducts from '../components/RelatedProducts'
 import QuantitySelector from '../components/ui/QuantitySelector'
 import Skeleton from '../components/ui/Skeleton'
 import Breadcrumb from '../components/ui/Breadcrumb'
 import VirtualTryOn from '../components/VirtualTryOn'
+
+const getUserIdFromToken = (token) => {
+  try { return JSON.parse(atob(token.split('.')[1])).id } catch { return null }
+}
+
+const StarRating = ({ value, max = 5, size = 'sm' }) => {
+  const dim = size === 'lg' ? 'w-5 h-5' : 'w-3.5 h-3.5'
+  return (
+    <div className="flex gap-0.5">
+      {[...Array(max)].map((_, i) => (
+        <svg key={i} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
+          fill={i < Math.round(value) ? 'currentColor' : 'none'}
+          stroke="currentColor" strokeWidth={i < Math.round(value) ? 0 : 1.5}
+          className={`${dim} ${i < Math.round(value) ? 'text-jewelry-gold' : 'text-gray-300'}`}>
+          <path fillRule="evenodd" d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401Z" clipRule="evenodd" />
+        </svg>
+      ))}
+    </div>
+  )
+}
+
+const StarInput = ({ value, onChange }) => (
+  <div className="flex gap-1">
+    {[1, 2, 3, 4, 5].map(star => (
+      <button key={star} type="button" onClick={() => onChange(star)}
+        className="transition-transform hover:scale-110"
+        aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
+          fill={star <= value ? 'currentColor' : 'none'}
+          stroke="currentColor" strokeWidth={star <= value ? 0 : 1.5}
+          className={`w-7 h-7 ${star <= value ? 'text-jewelry-gold' : 'text-gray-300 hover:text-jewelry-gold'}`}>
+          <path fillRule="evenodd" d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401Z" clipRule="evenodd" />
+        </svg>
+      </button>
+    ))}
+  </div>
+)
 
 const ProductSkeleton = () => (
   <div className="border-t-2 pt-10">
@@ -32,7 +70,7 @@ const ProductSkeleton = () => (
 
 const Product = () => {
   const { productId } = useParams()
-  const { products, currency, addToCart, addToWishlist, removeFromWishlist, isWishlisted } = useContext(ShopContext)
+  const { products, currency, addToCart, addToWishlist, removeFromWishlist, isWishlisted, token, backendUrl } = useContext(ShopContext)
   const [productData, setProductData] = useState(null)
   const [image, setImage] = useState('')
   const [quantity, setQuantity] = useState(1)
@@ -40,13 +78,82 @@ const Product = () => {
   const [activeTab, setActiveTab] = useState('description')
   const [showTryOn, setShowTryOn] = useState(false)
 
+  // Reviews state
+  const [reviews, setReviews] = useState([])
+  const [reviewRating, setReviewRating] = useState(0)
+  const [reviewText, setReviewText] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
+
+  const currentUserId = token ? getUserIdFromToken(token) : null
+
+  const fetchFreshProduct = async () => {
+    try {
+      const res = await axios.post(backendUrl + '/api/product/single', { productId })
+      if (res.data.success) setReviews(res.data.product.reviews || [])
+    } catch { /* silent — reviews just stay as-is */ }
+  }
+
   useEffect(() => {
     const found = products.find(item => item._id === productId)
     if (found) {
       setProductData(found)
       setImage(found.image[0])
+      setReviews(found.reviews || [])
     }
   }, [productId, products])
+
+  useEffect(() => {
+    if (productId) fetchFreshProduct()
+  }, [productId])
+
+  const avgRating = reviews.length
+    ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
+    : null
+
+  const userReview = reviews.find(r => r.userId === currentUserId)
+
+  const handleSubmitReview = async (e) => {
+    e.preventDefault()
+    if (!token) { toast.error('Please log in to leave a review'); return }
+    if (reviewRating === 0) { toast.error('Please select a star rating'); return }
+    if (!reviewText.trim()) { toast.error('Please write your review'); return }
+    setSubmitting(true)
+    try {
+      const res = await axios.post(
+        backendUrl + '/api/review/add',
+        { productId, rating: reviewRating, text: reviewText },
+        { headers: { token } }
+      )
+      if (res.data.success) {
+        setReviews(res.data.reviews)
+        setReviewRating(0)
+        setReviewText('')
+        toast.success('Review submitted!')
+      } else {
+        toast.error(res.data.message)
+      }
+    } catch { toast.error('Failed to submit review') }
+    finally { setSubmitting(false) }
+  }
+
+  const handleDeleteReview = async (reviewId) => {
+    setDeletingId(reviewId)
+    try {
+      const res = await axios.post(
+        backendUrl + '/api/review/delete',
+        { productId, reviewId },
+        { headers: { token } }
+      )
+      if (res.data.success) {
+        setReviews(res.data.reviews)
+        toast.success('Review deleted')
+      } else {
+        toast.error(res.data.message)
+      }
+    } catch { toast.error('Failed to delete review') }
+    finally { setDeletingId(null) }
+  }
 
   const handleAddToCart = async () => {
     setAddingToCart(true)
@@ -178,32 +285,133 @@ const Product = () => {
               onClick={() => setActiveTab(tab)}
               className={`px-5 py-3 text-sm font-medium capitalize transition-colors ${activeTab === tab ? 'border-b-2 border-jewelry-charcoal text-jewelry-charcoal' : 'text-jewelry-stone hover:text-jewelry-charcoal'}`}
             >
-              {tab === 'reviews' ? `Reviews (${productData.reviews?.length ?? 0})` : 'Description'}
+              {tab === 'reviews' ? `Reviews (${reviews.length})` : 'Description'}
             </button>
           ))}
         </div>
 
         <div className="py-6 text-sm text-jewelry-stone leading-relaxed">
           {activeTab === 'description' && <p className="md:w-4/5">{productData.description}</p>}
+
           {activeTab === 'reviews' && (
-            productData.reviews?.length > 0
-              ? productData.reviews.map((review, i) => (
-                <div key={i} className="border-b border-gray-100 py-4">
-                  <p className="font-medium text-jewelry-charcoal">{review.name}</p>
-                  <div className="flex gap-0.5 mt-1">
-                    {[...Array(5)].map((_, j) => (
-                      <svg key={j} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 text-jewelry-gold"><path fillRule="evenodd" d="M8 1.75a.75.75 0 0 1 .692.462l1.41 3.393 3.664.293a.75.75 0 0 1 .428 1.317l-2.791 2.39.853 3.575a.75.75 0 0 1-1.12.814L7.998 11.92l-3.135 1.074a.75.75 0 0 1-1.12-.814l.852-3.574-2.79-2.39a.75.75 0 0 1 .427-1.318l3.663-.293 1.41-3.393A.75.75 0 0 1 8 1.75Z" clipRule="evenodd" /></svg>
-                    ))}
+            <div className="space-y-8">
+
+              {/* Average rating summary */}
+              {reviews.length > 0 && (
+                <div className="flex items-center gap-4 p-4 bg-jewelry-blush rounded-lg">
+                  <div className="text-center">
+                    <p className="text-4xl font-semibold text-jewelry-charcoal">{avgRating}</p>
+                    <StarRating value={Number(avgRating)} size="lg" />
+                    <p className="text-xs text-jewelry-stone mt-1">{reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}</p>
                   </div>
-                  <p className="mt-2">{review.text}</p>
+                  <div className="flex-1 space-y-1.5">
+                    {[5, 4, 3, 2, 1].map(star => {
+                      const count = reviews.filter(r => r.rating === star).length
+                      const pct = reviews.length ? Math.round((count / reviews.length) * 100) : 0
+                      return (
+                        <div key={star} className="flex items-center gap-2 text-xs">
+                          <span className="w-3 text-right text-jewelry-stone">{star}</span>
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3 text-jewelry-gold flex-shrink-0"><path fillRule="evenodd" d="M8 1.75a.75.75 0 0 1 .692.462l1.41 3.393 3.664.293a.75.75 0 0 1 .428 1.317l-2.791 2.39.853 3.575a.75.75 0 0 1-1.12.814L7.998 11.92l-3.135 1.074a.75.75 0 0 1-1.12-.814l.852-3.574-2.79-2.39a.75.75 0 0 1 .427-1.318l3.663-.293 1.41-3.393A.75.75 0 0 1 8 1.75Z" clipRule="evenodd" /></svg>
+                          <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                            <div className="h-full bg-jewelry-gold rounded-full transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="w-6 text-jewelry-stone">{count}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
-              ))
-              : (
+              )}
+
+              {/* Write a review */}
+              {!userReview && (
+                <div className="border border-gray-100 rounded-lg p-5">
+                  <h3 className="text-sm font-semibold text-jewelry-charcoal mb-4">Write a Review</h3>
+                  {!token ? (
+                    <p className="text-jewelry-stone text-sm">
+                      Please <button onClick={() => window.location.href = '/login'} className="text-jewelry-charcoal underline hover:text-jewelry-gold transition-colors">log in</button> to leave a review.
+                    </p>
+                  ) : (
+                    <form onSubmit={handleSubmitReview} className="space-y-4">
+                      <div>
+                        <p className="text-xs text-jewelry-stone mb-2">Your rating <span className="text-red-400">*</span></p>
+                        <StarInput value={reviewRating} onChange={setReviewRating} />
+                      </div>
+                      <div>
+                        <p className="text-xs text-jewelry-stone mb-2">Your review <span className="text-red-400">*</span></p>
+                        <textarea
+                          value={reviewText}
+                          onChange={e => setReviewText(e.target.value)}
+                          rows={4}
+                          placeholder="Share your experience with this piece…"
+                          className="w-full border border-gray-200 rounded px-3 py-2.5 text-sm text-jewelry-charcoal placeholder-gray-300 outline-none focus:border-jewelry-charcoal transition-colors resize-none"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={submitting}
+                        className="bg-jewelry-charcoal text-white px-6 py-2.5 text-xs font-medium hover:bg-jewelry-gold transition-colors duration-200 disabled:opacity-60 flex items-center gap-2"
+                      >
+                        {submitting && <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                        {submitting ? 'Submitting…' : 'Submit Review'}
+                      </button>
+                    </form>
+                  )}
+                </div>
+              )}
+
+              {/* Reviews list */}
+              {reviews.length === 0 ? (
                 <div className="py-10 text-center">
-                  <p className="text-jewelry-stone-light mb-1">No reviews yet</p>
-                  <p className="text-xs text-gray-300">Be the first to review this piece</p>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor" className="w-12 h-12 text-gray-200 mx-auto mb-3">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
+                  </svg>
+                  <p className="text-jewelry-stone font-medium">No reviews yet</p>
+                  <p className="text-xs text-gray-400 mt-1">Be the first to share your experience</p>
                 </div>
-              )
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {reviews.map(review => {
+                    const isOwn = review.userId === currentUserId
+                    return (
+                      <div key={review._id} className={`py-5 ${isOwn ? 'bg-jewelry-blush/40 -mx-1 px-1 rounded' : ''}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-jewelry-charcoal text-white flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                              {review.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-semibold text-jewelry-charcoal">{review.name}</p>
+                                {isOwn && <span className="text-[10px] bg-jewelry-gold/20 text-jewelry-gold px-1.5 py-0.5 rounded font-medium">Your review</span>}
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <StarRating value={review.rating} />
+                                <span className="text-[11px] text-gray-300">·</span>
+                                <span className="text-[11px] text-gray-400">
+                                  {new Date(review.date).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          {isOwn && (
+                            <button
+                              onClick={() => handleDeleteReview(review._id)}
+                              disabled={deletingId === review._id}
+                              className="text-xs text-gray-400 hover:text-red-500 transition-colors flex-shrink-0 disabled:opacity-50"
+                              aria-label="Delete your review"
+                            >
+                              {deletingId === review._id ? 'Deleting…' : 'Delete'}
+                            </button>
+                          )}
+                        </div>
+                        <p className="mt-3 text-jewelry-stone leading-relaxed pl-11">{review.text}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
