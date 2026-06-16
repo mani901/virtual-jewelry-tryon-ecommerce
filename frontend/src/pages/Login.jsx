@@ -1,18 +1,35 @@
-import { useContext, useEffect, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { ShopContext } from '../context/ShopContext'
 import axios from 'axios'
 import { toast } from 'react-toastify'
 import Spinner from '../components/ui/Spinner'
 
 const Login = () => {
-  const [currentState, setCurrentState] = useState('Login')
+  const [currentState, setCurrentState] = useState('Login') // 'Login' | 'Sign Up' | 'Verify OTP'
   const { token, setToken, navigate, backendUrl } = useContext(ShopContext)
+
+  // Sign Up / Login fields
   const [name, setName] = useState('')
-  const [password, setPassword] = useState('')
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [errors, setErrors] = useState({})
+
+  // OTP step
+  const [otp, setOtp] = useState('')
+  const [countdown, setCountdown] = useState(0)
+  // pendingName/Email/Password keep the sign-up values alive during OTP step so resend works
+  const pendingRef = useRef({ name: '', email: '', password: '' })
+
+  // Countdown timer for resend
+  useEffect(() => {
+    if (countdown <= 0) return
+    const id = setTimeout(() => setCountdown(c => c - 1), 1000)
+    return () => clearTimeout(id)
+  }, [countdown])
+
+  useEffect(() => { if (token) navigate('/') }, [token])
 
   const validate = () => {
     const e = {}
@@ -25,17 +42,48 @@ const Login = () => {
 
   const onSubmitHandler = async (event) => {
     event.preventDefault()
+
+    // OTP verification step
+    if (currentState === 'Verify OTP') {
+      if (!otp.trim() || otp.length !== 6) {
+        toast.error('Please enter the 6-digit code')
+        return
+      }
+      setLoading(true)
+      try {
+        const response = await axios.post(backendUrl + '/api/user/verify-otp', {
+          email: pendingRef.current.email,
+          otp,
+        })
+        if (response.data.success) {
+          setToken(response.data.token)
+          localStorage.setItem('token', response.data.token)
+          toast.success('Account created! Welcome to Zewar House.')
+        } else {
+          setOtp('')
+          toast.error(response.data.message)
+        }
+      } catch {
+        toast.error('Something went wrong. Please try again.')
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
     const errs = validate()
     if (Object.keys(errs).length) { setErrors(errs); return }
 
     setLoading(true)
     try {
       if (currentState === 'Sign Up') {
-        const response = await axios.post(backendUrl + '/api/user/register', { name, email, password })
+        const response = await axios.post(backendUrl + '/api/user/send-otp', { name, email, password })
         if (response.data.success) {
-          setToken(response.data.token)
-          localStorage.setItem('token', response.data.token)
-          toast.success('Account created! Welcome to Zewar House.')
+          pendingRef.current = { name, email, password }
+          setCurrentState('Verify OTP')
+          setCountdown(60)
+          setOtp('')
+          toast.success('OTP sent! Check your email.')
         } else {
           toast.error(response.data.message)
         }
@@ -49,24 +97,109 @@ const Login = () => {
           toast.error(response.data.message)
         }
       }
-    } catch (error) {
-      toast.error('Login failed. Please check your credentials.')
+    } catch {
+      toast.error('Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { if (token) navigate('/') }, [token])
+  const handleResend = async () => {
+    setLoading(true)
+    try {
+      const { name: n, email: e, password: p } = pendingRef.current
+      const response = await axios.post(backendUrl + '/api/user/send-otp', { name: n, email: e, password: p })
+      if (response.data.success) {
+        setOtp('')
+        setCountdown(60)
+        toast.success('New OTP sent!')
+      } else {
+        toast.error(response.data.message)
+      }
+    } catch {
+      toast.error('Failed to resend OTP.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const switchState = (state) => {
     setCurrentState(state)
     setErrors({})
-    setName(''); setEmail(''); setPassword('')
+    setName(''); setEmail(''); setPassword(''); setOtp('')
   }
 
   const fieldClass = (field) =>
     `w-full px-3 py-2.5 border text-sm outline-none transition-colors ${errors[field] ? 'border-red-400 bg-red-50' : 'border-gray-300 focus:border-jewelry-charcoal'}`
 
+  // ── OTP verification screen ──────────────────────────────────────────────
+  if (currentState === 'Verify OTP') {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center px-4">
+        <form onSubmit={onSubmitHandler} noValidate className="w-full max-w-sm">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-3">
+              <p className="prata-regular text-3xl">Verify Email</p>
+              <hr className="border-none h-[1.5px] w-8 bg-gray-800" />
+            </div>
+            <p className="text-gray-500 text-sm mt-3">
+              We sent a 6-digit code to<br />
+              <span className="font-medium text-gray-700">{pendingRef.current.email}</span>
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <div>
+              <input
+                value={otp}
+                onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                className="w-full px-3 py-2.5 border border-gray-300 focus:border-jewelry-charcoal outline-none transition-colors text-center tracking-[0.5em] text-lg font-medium"
+                placeholder="000000"
+                aria-label="One-time password"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="bg-jewelry-charcoal text-white font-light px-8 py-3 hover:bg-jewelry-gold transition-colors duration-200 disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {loading && <Spinner size="sm" color="white" />}
+              {loading ? 'Verifying…' : 'Verify & Create Account'}
+            </button>
+
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <button
+                type="button"
+                onClick={() => switchState('Sign Up')}
+                className="hover:text-jewelry-charcoal transition-colors"
+              >
+                ← Back to Sign Up
+              </button>
+              {countdown > 0
+                ? <span>Resend in {countdown}s</span>
+                : (
+                  <button
+                    type="button"
+                    onClick={handleResend}
+                    disabled={loading}
+                    className="hover:text-jewelry-charcoal transition-colors disabled:opacity-50"
+                  >
+                    Resend OTP
+                  </button>
+                )
+              }
+            </div>
+          </div>
+        </form>
+      </div>
+    )
+  }
+
+  // ── Login / Sign Up screen ───────────────────────────────────────────────
   return (
     <div className="min-h-[70vh] flex items-center justify-center px-4">
       <form onSubmit={onSubmitHandler} noValidate className="w-full max-w-sm">
@@ -155,7 +288,10 @@ const Login = () => {
             className="bg-jewelry-charcoal text-white font-light px-8 py-3 mt-2 hover:bg-jewelry-gold transition-colors duration-200 disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {loading && <Spinner size="sm" color="white" />}
-            {loading ? 'Please wait…' : currentState === 'Login' ? 'Sign In' : 'Sign Up'}
+            {loading
+              ? (currentState === 'Sign Up' ? 'Sending OTP…' : 'Please wait…')
+              : (currentState === 'Login' ? 'Sign In' : 'Send OTP')
+            }
           </button>
         </div>
       </form>
