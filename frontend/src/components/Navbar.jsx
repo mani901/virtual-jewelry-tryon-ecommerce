@@ -4,15 +4,21 @@ import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { ShopContext } from '../context/ShopContext'
 import { toast } from 'react-toastify'
 
+const HeartIcon = ({ filled }) => filled
+  ? <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-red-500"><path d="m9.653 16.915-.005-.003-.019-.01a20.759 20.759 0 0 1-1.162-.682 22.045 22.045 0 0 1-2.582-2.184C4.045 12.376 2 9.515 2 6.5a4.5 4.5 0 0 1 8-2.828A4.5 4.5 0 0 1 18 6.5c0 3.015-2.045 5.876-3.885 7.536a22.049 22.049 0 0 1-3.744 2.865l-.019.01-.005.003h-.002a.739.739 0 0 1-.69.001l-.002-.001Z" /></svg>
+  : <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
+
 const Navbar = () => {
   const [visible, setVisible] = useState(false)
-  const { setShowSearch, getCartCount, token, setToken, setCartItems } = useContext(ShopContext)
+  const { setShowSearch, getCartCount, token, setToken, setCartItems, getWishlistCount, setWishlistItems } = useContext(ShopContext)
   const navigate = useNavigate()
 
   const logout = () => {
     localStorage.removeItem('token')
+    localStorage.removeItem('wishlistItems')
     setToken('')
     setCartItems({})
+    setWishlistItems({})
     navigate('/login')
     toast.success('Logged out successfully')
   }
@@ -42,6 +48,15 @@ const Navbar = () => {
           <img src={assets.search_icon} className="w-5" alt="Search" />
         </button>
 
+        <Link to="/wishlist" className="relative hover:text-jewelry-gold transition-colors" aria-label={`Wishlist (${getWishlistCount()} items)`}>
+          <HeartIcon filled={getWishlistCount() > 0} />
+          {getWishlistCount() > 0 && (
+            <span className="absolute -right-1.5 -bottom-1.5 w-4 text-center leading-4 bg-red-500 text-white aspect-square rounded-full text-[8px] font-medium">
+              {getWishlistCount()}
+            </span>
+          )}
+        </Link>
+
         <div className="group relative">
           <button
             onClick={() => { if (!token) navigate('/login') }}
@@ -53,6 +68,7 @@ const Navbar = () => {
           {token && (
             <div className="group-hover:block hidden absolute dropdown-menu right-0 pt-4 z-50">
               <div className="flex flex-col gap-1 w-40 py-3 px-4 bg-white shadow-lg border border-gray-100 rounded-lg text-sm text-gray-600">
+                <Link to="/wishlist" className="py-1 hover:text-jewelry-charcoal transition-colors">My Wishlist</Link>
                 <Link to="/orders" className="py-1 hover:text-jewelry-charcoal transition-colors">My Orders</Link>
                 <button onClick={logout} className="text-left py-1 hover:text-red-500 transition-colors">Logout</button>
               </div>
@@ -100,6 +116,7 @@ const Navbar = () => {
             ))}
             {token && (
               <>
+                <Link onClick={() => setVisible(false)} to="/wishlist" className="py-3 pl-6 border-b text-sm hover:text-jewelry-charcoal">MY WISHLIST</Link>
                 <Link onClick={() => setVisible(false)} to="/orders" className="py-3 pl-6 border-b text-sm hover:text-jewelry-charcoal">MY ORDERS</Link>
                 <button onClick={() => { setVisible(false); logout() }} className="text-left py-3 pl-6 text-sm text-red-500 hover:text-red-600">LOGOUT</button>
               </>

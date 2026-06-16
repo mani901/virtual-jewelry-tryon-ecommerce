@@ -32,7 +32,7 @@ const ProductSkeleton = () => (
 
 const Product = () => {
   const { productId } = useParams()
-  const { products, currency, addToCart } = useContext(ShopContext)
+  const { products, currency, addToCart, addToWishlist, removeFromWishlist, isWishlisted } = useContext(ShopContext)
   const [productData, setProductData] = useState(null)
   const [image, setImage] = useState('')
   const [quantity, setQuantity] = useState(1)
@@ -130,6 +130,24 @@ const Product = () => {
                   Adding…
                 </>
               ) : 'ADD TO CART'}
+            </button>
+            <button
+              onClick={() => {
+                if (isWishlisted(productData._id)) {
+                  removeFromWishlist(productData._id)
+                  toast.success('Removed from wishlist')
+                } else {
+                  addToWishlist(productData._id)
+                  toast.success('Added to wishlist!')
+                }
+              }}
+              className={`w-11 h-11 border flex items-center justify-center transition-colors duration-200 ${isWishlisted(productData._id) ? 'border-red-400 bg-red-50 text-red-500' : 'border-gray-300 text-gray-400 hover:border-red-400 hover:text-red-500'}`}
+              aria-label={isWishlisted(productData._id) ? 'Remove from wishlist' : 'Add to wishlist'}
+            >
+              {isWishlisted(productData._id)
+                ? <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5"><path d="m9.653 16.915-.005-.003-.019-.01a20.759 20.759 0 0 1-1.162-.682 22.045 22.045 0 0 1-2.582-2.184C4.045 12.376 2 9.515 2 6.5a4.5 4.5 0 0 1 8-2.828A4.5 4.5 0 0 1 18 6.5c0 3.015-2.045 5.876-3.885 7.536a22.049 22.049 0 0 1-3.744 2.865l-.019.01-.005.003h-.002a.739.739 0 0 1-.69.001l-.002-.001Z" /></svg>
+                : <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
+              }
             </button>
           </div>
 

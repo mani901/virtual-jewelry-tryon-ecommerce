@@ -5,13 +5,26 @@ import { toast } from 'react-toastify'
 import Badge from './ui/Badge'
 
 const ProductItem = ({ id, image, name, price, bestseller, isNew }) => {
-  const { currency, addToCart } = useContext(ShopContext)
+  const { currency, addToCart, addToWishlist, removeFromWishlist, isWishlisted } = useContext(ShopContext)
+  const wishlisted = isWishlisted(id)
 
   const handleQuickAdd = (e) => {
     e.preventDefault()
     e.stopPropagation()
     addToCart(id, 1)
     toast.success('Added to cart!')
+  }
+
+  const handleWishlistToggle = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (wishlisted) {
+      removeFromWishlist(id)
+      toast.success('Removed from wishlist')
+    } else {
+      addToWishlist(id)
+      toast.success('Added to wishlist!')
+    }
   }
 
   return (
@@ -26,6 +39,16 @@ const ProductItem = ({ id, image, name, price, bestseller, isNew }) => {
           {bestseller && <Badge variant="bestseller" label="Bestseller" />}
           {isNew && !bestseller && <Badge variant="new" label="New" />}
         </div>
+        <button
+          onClick={handleWishlistToggle}
+          className={`absolute top-2 right-2 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md transition-all duration-200 ${wishlisted ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} hover:scale-110`}
+          aria-label={wishlisted ? `Remove ${name} from wishlist` : `Add ${name} to wishlist`}
+        >
+          {wishlisted
+            ? <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-red-500"><path d="m9.653 16.915-.005-.003-.019-.01a20.759 20.759 0 0 1-1.162-.682 22.045 22.045 0 0 1-2.582-2.184C4.045 12.376 2 9.515 2 6.5a4.5 4.5 0 0 1 8-2.828A4.5 4.5 0 0 1 18 6.5c0 3.015-2.045 5.876-3.885 7.536a22.049 22.049 0 0 1-3.744 2.865l-.019.01-.005.003h-.002a.739.739 0 0 1-.69.001l-.002-.001Z" /></svg>
+            : <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-500"><path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
+          }
+        </button>
         <button
           onClick={handleQuickAdd}
           className="absolute bottom-2 right-2 w-9 h-9 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-200 hover:bg-jewelry-charcoal hover:text-white"

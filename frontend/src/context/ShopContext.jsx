@@ -28,6 +28,10 @@ const ShopContextProvider = (props) => {
     return isNested ? {} : parsed;
   });
 
+  const [wishlistItems, setWishlistItems] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('wishlistItems') || '{}'); } catch { return {}; }
+  });
+
   const [products, setProducts] = useState([]);
   const [token, setToken] = useState('');
   const [user, setUser] = useState(null);
@@ -100,19 +104,65 @@ const ShopContextProvider = (props) => {
     }
   };
 
+  const addToWishlist = async (itemId) => {
+    const updated = { ...wishlistItems, [itemId]: true };
+    setWishlistItems(updated);
+    if (token) {
+      try {
+        await axios.post(backendUrl + '/api/wishlist/add', { itemId }, { headers: { token } });
+      } catch (error) {
+        toast.error(friendlyError(error));
+      }
+    }
+  };
+
+  const removeFromWishlist = async (itemId) => {
+    const updated = { ...wishlistItems };
+    delete updated[itemId];
+    setWishlistItems(updated);
+    if (token) {
+      try {
+        await axios.post(backendUrl + '/api/wishlist/remove', { itemId }, { headers: { token } });
+      } catch (error) {
+        toast.error(friendlyError(error));
+      }
+    }
+  };
+
+  const isWishlisted = (itemId) => !!wishlistItems[itemId];
+
+  const getWishlistCount = () => Object.keys(wishlistItems).length;
+
+  const getUserWishlist = async (token) => {
+    try {
+      const response = await axios.post(backendUrl + '/api/wishlist/get', {}, { headers: { token } });
+      if (response.data.success) {
+        setWishlistItems(response.data.wishlistData || {});
+      }
+    } catch (error) {
+      toast.error(friendlyError(error));
+    }
+  };
+
   useEffect(() => {
     getProductsData();
   }, []);
 
   useEffect(() => {
-    if (!token && localStorage.getItem('token')) {
-      setToken(localStorage.getItem('token'));
+    const savedToken = localStorage.getItem('token');
+    if (!token && savedToken) {
+      setToken(savedToken);
+      getUserWishlist(savedToken);
     }
   }, []);
 
   useEffect(() => {
     localStorage.setItem('cartItems', JSON.stringify(cartItems));
   }, [cartItems]);
+
+  useEffect(() => {
+    localStorage.setItem('wishlistItems', JSON.stringify(wishlistItems));
+  }, [wishlistItems]);
 
   const value = {
     products,
@@ -133,7 +183,13 @@ const ShopContextProvider = (props) => {
     token,
     setToken,
     user,
-    setUser
+    setUser,
+    wishlistItems,
+    setWishlistItems,
+    addToWishlist,
+    removeFromWishlist,
+    isWishlisted,
+    getWishlistCount
   };
 
   return (

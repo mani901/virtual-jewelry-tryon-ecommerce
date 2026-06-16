@@ -12,6 +12,7 @@ import Login from './pages/Login'
 import PlaceOrder from './pages/PlaceOrder'
 import Orders from './pages/Orders'
 import Verify from './pages/Verify'
+import Wishlist from './pages/Wishlist'
 
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
@@ -37,6 +38,7 @@ const AnimatedRoutes = () => {
         <Route path="/place-order" element={<PageTransition><PlaceOrder /></PageTransition>} />
         <Route path="/orders" element={<PageTransition><Orders /></PageTransition>} />
         <Route path="/verify" element={<PageTransition><Verify /></PageTransition>} />
+        <Route path="/wishlist" element={<PageTransition><Wishlist /></PageTransition>} />
       </Routes>
     </AnimatePresence>
   )
