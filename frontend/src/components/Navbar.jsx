@@ -41,7 +41,7 @@ const Navbar = () => {
 
       <div className="flex items-center gap-5">
         <button
-          onClick={() => setShowSearch(true)}
+          onClick={() => { setShowSearch(true); navigate('/collection') }}
           className="hover:text-jewelry-gold transition-colors"
           aria-label="Search"
         >

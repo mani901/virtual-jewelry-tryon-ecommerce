@@ -153,9 +153,14 @@ const userOrders = async (req,res) => {
 const updateStatus = async (req,res) => {
     try {
         const { orderId,status } = req.body
-        await orderModel.findByIdAndUpdate(orderId,{status})
+        const order = await orderModel.findById(orderId)
+        const update = { status }
+        if (status === 'Delivered' && order.paymentMethod === 'COD') {
+            update.payment = true
+        }
+        await orderModel.findByIdAndUpdate(orderId,update)
         res.json({success:true,message:'Status Updated'})
-        
+
     } catch (error) {
         console.log(error);
         res.json({success:false,message:error.message})
