@@ -157,6 +157,20 @@ const ShopContextProvider = (props) => {
   }, []);
 
   useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      res => res,
+      error => {
+        if (error.response?.status === 401) {
+          setToken('');
+          localStorage.removeItem('token');
+        }
+        return Promise.reject(error);
+      }
+    );
+    return () => axios.interceptors.response.eject(interceptor);
+  }, []);
+
+  useEffect(() => {
     localStorage.setItem('cartItems', JSON.stringify(cartItems));
   }, [cartItems]);
 
